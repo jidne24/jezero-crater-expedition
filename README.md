@@ -126,7 +126,7 @@ $$P_{\text{total}} = P_{\text{Mobility [1]}} + P_{\text{Heater [2]}} + P_{\text{
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone [https://github.com/jidne24/jezero-crater-expedition.git](https://github.com/jidne24/jezero-crater-expedition.git)
+git clone https://github.com/jidne24/jezero-crater-expedition.git
 cd jezero-crater-expedition
 npm install
 ```
@@ -153,4 +153,4 @@ npx tsc --noEmit && npm run build
 
 * **3D Models:** Official NASA 3D Resources Repository (`NASA Extravehicular Mobility Unit Spacesuit` & `Mars 2020 Perseverance Rover`).
 * **Scientific Datasets:** NASA Open APIs (`api.nasa.gov`), NASA Goddard CCMC (`DONKI`), NASA Open Science Data Repository (`OSDR` & `RadLab`), NASA JPL/Caltech (`Mars Trek` & `Mars 2020 MEDA`), and the **Canadian Space Agency (CSA)** (*Food Production on the Moon and in Remote Areas Toolkit*).
-* **Disclaimer:** *NASA and CSA do not endorse any non-U.S. / non-Canadian Government entity. Built by **Team Virodis (Gidne Huda)** for the 2026 NASA Space Apps Challenge.*
+* **Disclaimer:** *NASA and CSA do not endorse any non-U.S. / non-Canadian Government entity. Built by **Team 24(Gidne Huda)** for the NASA Space Apps Challenge 2026.*
