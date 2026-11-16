@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import { Experience } from './components/canvas/Experience';
 import { DebriefModal } from './components/ui/DebriefModal';
 import { HUD } from './components/ui/HUD';
@@ -14,6 +15,7 @@ export default function App() {
       <TelemetryBox />
       <DebriefModal />
       <LoadingScreen />
+      <Analytics />
     </div>
   );
 }
