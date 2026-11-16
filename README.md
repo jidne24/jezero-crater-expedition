@@ -11,7 +11,7 @@
 
 **An interactive 3D browser-based astronaut training simulation for ages 7–12 (and curious adults), grounded in authentic NASA and Canadian Space Agency (CSA) telemetry.**
 
-[🚀 **Launch Live Web App**](https://jezero-crater-expedition.vercel.app) • [📖 **NASA & CSA Data Traceability**](#-official-nasa--csa-data-integration) • [🎮 **How to Play**](#-controls--mission-loop)
+[🚀 **Launch Live Web App**](https://jezero-crater-expedition.vercel.app) • [📖 **NASA & CSA Data Traceability**](## 🛰️ Official NASA & CSA Data Integration) • [🎮 **How to Play**](#-controls--mission-loop)
 
 </div>
 
