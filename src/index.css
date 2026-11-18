@@ -33,6 +33,7 @@
 }
 
 :root {
+  --ui-scale: 1;
   font-family: var(--font-sans);
   color: #f8fafc;
   background: #020617;
@@ -40,6 +41,10 @@
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.ui-scaled {
+  transform: scale(var(--ui-scale));
 }
 
 html,
@@ -51,6 +56,9 @@ body,
   padding: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   background-color: #020617;
 }
 
@@ -176,8 +184,34 @@ a:focus-visible {
   will-change: transform;
 }
 
+.orientation-device {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes orientation-device-rotate {
+  0%,
+  18% {
+    transform: rotate(0deg);
+  }
+  68%,
+  100% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orientation-device {
+    animation: orientation-device-rotate 2.8s ease-in-out infinite;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .radiation-static {
     animation: none;
+  }
+
+  .orientation-device {
+    transform: rotate(90deg);
   }
 }

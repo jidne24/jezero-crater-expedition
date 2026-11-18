@@ -3,6 +3,7 @@ import { Stars } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/useGameStore';
+import { isMobileOrTablet } from '../../utils/deviceUtils';
 import { getTerrainHeight } from './MarsOutpost';
 import {
   DUST_DEVIL_COUNT,
@@ -10,7 +11,7 @@ import {
   setDustDevilPosition,
 } from './weatherHazards';
 
-const DUST_PARTICLE_COUNT = 1500;
+const DUST_PARTICLE_COUNT = isMobileOrTablet() ? 450 : 1200;
 const DUST_HALF_EXTENT = 60;
 const DUST_HEIGHT = 40;
 const DEVIL_PARTICLE_COUNT = 220;

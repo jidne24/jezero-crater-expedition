@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertTriangle, Crosshair, MousePointer2, Snowflake, Volume2, VolumeX } from 'lucide-react';
-import { setVirtualKey, triggerVirtualAction, useKeyboardDisplayState } from '../../hooks/useKeyboard';
+import { setVirtualKey, triggerKeyAction, triggerVirtualAction, useKeyboardDisplayState } from '../../hooks/useKeyboard';
 import type { VirtualKey } from '../../hooks/useKeyboard';
 import { getPowerRequirements, useGameStore } from '../../store/useGameStore';
 import type { ActiveStation, PowerSystem, SolTasks } from '../../store/useGameStore';
+import { enterBrowserFullscreen, isFullscreenActive } from '../../utils/deviceUtils';
 import { KID_GLOSSARY } from '../../utils/nasaDataEngine';
 import { useNavigationTelemetry } from '../../utils/navigationTelemetry';
 import { SAMPLE_TUBES, STATIONS } from '../canvas/MarsOutpost';
 
+const UI_SCALE_TRANSFORM = 'scale(var(--ui-scale, 1))';
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 const formatPower = (value: number) => Number.isInteger(value) ? value.toString() : value.toFixed(1);
 
@@ -29,7 +31,7 @@ const Keycap = ({ label, pressed, virtualKey }: { label: string; pressed: boolea
     onPointerLeave={() => setVirtualKey(virtualKey, false)}
     onPointerCancel={() => setVirtualKey(virtualKey, false)}
     onContextMenu={(event) => event.preventDefault()}
-    className={`pointer-events-auto flex h-10 w-10 touch-none select-none items-center justify-center rounded-lg font-sans text-lg font-bold transition-all duration-75 md:h-12 md:w-12 md:rounded-xl lg:h-14 lg:w-[54px] ${pressed ? 'scale-95 bg-white text-slate-900 shadow-md' : 'border border-white/15 bg-slate-900/55 text-white/90 backdrop-blur-md'}`}
+    className={`pointer-events-auto flex h-14 w-[54px] cursor-pointer touch-none select-none items-center justify-center rounded-xl font-sans text-lg font-bold transition-all duration-75 active:scale-95 ${pressed ? 'scale-95 bg-white text-slate-900 shadow-md' : 'border border-white/15 bg-slate-900/55 text-white/90 backdrop-blur-md'}`}
   >
     {label}
   </button>
@@ -48,7 +50,7 @@ const ActionPrompt = ({ icon, label, keyLabel, pressed, action }: {
   pressed: boolean;
   action: 'interact' | 'jump' | 'togglePov' | 'sprint';
 }) => {
-  const isSprint = action === 'sprint';
+  const holdKey = action === 'jump' ? 'jump' : action === 'sprint' ? 'sprint' : null;
   return (
     <button
       type="button"
@@ -56,19 +58,20 @@ const ActionPrompt = ({ icon, label, keyLabel, pressed, action }: {
       data-ui-interactive
       onPointerDown={(event) => {
         event.stopPropagation();
-        if (isSprint) setVirtualKey('shift', true);
-        else triggerVirtualAction(action);
+        if (holdKey) setVirtualKey(holdKey, true);
+        else if (action === 'togglePov') useGameStore.getState().toggleCameraPov();
+        else triggerVirtualAction('interact');
       }}
       onPointerUp={() => {
-        if (isSprint) setVirtualKey('shift', false);
+        if (holdKey) setVirtualKey(holdKey, false);
       }}
       onPointerLeave={() => {
-        if (isSprint) setVirtualKey('shift', false);
+        if (holdKey) setVirtualKey(holdKey, false);
       }}
       onPointerCancel={() => {
-        if (isSprint) setVirtualKey('shift', false);
+        if (holdKey) setVirtualKey(holdKey, false);
       }}
-      className={`pointer-events-auto flex shrink-0 touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 py-1 text-xs font-bold transition-colors ${pressed ? 'scale-95 bg-white/15 text-white' : 'text-white/75 hover:bg-white/10'}`}
+      className={`pointer-events-auto flex shrink-0 cursor-pointer touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 py-1 text-xs font-bold transition-colors active:scale-95 ${pressed ? 'scale-95 bg-white/15 text-white' : 'text-white/75 hover:bg-white/10'}`}
     >
       <span aria-hidden="true">{icon}</span>
       <span>{label}</span>
@@ -85,18 +88,19 @@ const PowerToggle = ({ system, icon, label, shortcut, value, pressed }: {
   value: number;
   pressed: boolean;
 }) => {
-  const action = system === 'thruster' ? 'power1' : system === 'thermal' ? 'power2' : 'power3';
+  const allocatePower = useGameStore((state) => state.allocatePower);
   return (
     <button
       type="button"
       aria-label={`Boost ${label} by 10 percent`}
       title={`Boost ${label} by 10% · the other systems share the cost`}
       data-ui-interactive
-      onPointerDown={(event) => {
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
         event.stopPropagation();
-        triggerVirtualAction(action);
+        allocatePower(system, 10);
       }}
-      className={`pointer-events-auto flex shrink-0 touch-none select-none cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-1 py-1 text-xs font-bold transition-colors ${pressed ? 'scale-95 bg-white text-slate-900' : 'text-white/85 hover:bg-white/10'}`}
+      className={`pointer-events-auto flex shrink-0 cursor-pointer touch-none select-none items-center gap-1 whitespace-nowrap rounded-full px-1 py-1 text-xs font-bold transition-colors active:scale-95 ${pressed ? 'scale-95 bg-white text-slate-900' : 'text-white/85 hover:bg-white/10'}`}
     >
       <span aria-hidden="true">{icon}</span>
       <span>{label}</span>
@@ -173,7 +177,7 @@ const CompassRibbon = () => {
   }
 
   return (
-    <section aria-label="Compass and mission navigation" className="absolute top-3 left-1/2 h-[70px] w-[42vw] -translate-x-1/2 overflow-hidden rounded-2xl border border-cyan-100/20 bg-slate-950/65 text-xs shadow-[0_0_30px_rgba(34,211,238,0.08)] backdrop-blur-md md:text-sm lg:w-[min(580px,48vw)]">
+    <section aria-label="Compass and mission navigation" className="absolute left-1/2 top-3 h-[70px] w-[580px] -translate-x-1/2 overflow-hidden rounded-2xl border border-cyan-100/20 bg-slate-950/65 text-sm shadow-[0_0_30px_rgba(34,211,238,0.08)] backdrop-blur-md">
       <div className="absolute inset-x-0 top-0 h-7 border-b border-white/10 bg-white/[0.03]">
         {CARDINALS.map((cardinal) => {
           const relative = relativeBearing(cardinal.bearing, heading);
@@ -185,7 +189,7 @@ const CompassRibbon = () => {
           );
         })}
       </div>
-      <div className="absolute top-[26px] left-1/2 h-2 w-px bg-orange-300 shadow-[0_0_8px_#fb923c]" />
+      <div className="absolute left-1/2 top-[26px] h-2 w-px bg-orange-300 shadow-[0_0_8px_#fb923c]" />
       <div className="absolute inset-x-2 bottom-1 h-8">
         {STATIONS.map((station) => {
           const navigationIcon = STATION_NAVIGATION[station.id];
@@ -204,7 +208,7 @@ const CompassRibbon = () => {
             <span key={station.id} title={`${navigationIcon.label} · ${distance}m`} aria-label={`${navigationIcon.label}, ${distance} meters${isOffscreen ? ', off screen' : ''}`} className={`absolute bottom-0 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-slate-900/80 px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-cyan-100 transition-[left] duration-100 ease-linear ${isOffscreen ? 'opacity-60' : ''}`} style={{ left: `${markerPosition}%` }}>
               {isOffscreen && <span aria-hidden="true">{relative < 0 ? '‹' : '›'}</span>}
               <span aria-hidden="true">{navigationIcon.icon}</span>
-              <span className="hidden sm:inline">{navigationIcon.label}</span>
+              <span>{navigationIcon.label}</span>
             </span>
           );
         })}
@@ -233,7 +237,6 @@ const CompassRibbon = () => {
 export const HUD = () => {
   const gameStatus = useGameStore((state) => state.gameStatus);
   const audioMuted = useGameStore((state) => state.audioMuted);
-  const toggleAudioMuted = useGameStore((state) => state.toggleAudioMuted);
   const cameraPov = useGameStore((state) => state.cameraPov);
   const suitOxygenAndHeat = useGameStore((state) => state.suitOxygenAndHeat);
   const outpostIntegrity = useGameStore((state) => state.outpostIntegrity);
@@ -248,7 +251,7 @@ export const HUD = () => {
   const activeSol = useGameStore((state) => state.solsData[state.currentSolIndex]!);
   const pressed = useKeyboardDisplayState();
   const [isPointerLocked, setIsPointerLocked] = useState(false);
-  const [isTouchDevice] = useState(() => 'ontouchstart' in window || navigator.maxTouchPoints > 0);
+  const [isFullscreen, setIsFullscreen] = useState(() => isFullscreenActive());
   const requirements = getPowerRequirements(activeSol);
   const showFrost = suitOxygenAndHeat < 45 || activeSol.weatherType === 'DEEP_FREEZE';
   const showRadiation = outpostIntegrity < 45 || activeSol.weatherType === 'SOLAR_STORM' || shieldSensorPower < requirements.requiredShield;
@@ -262,6 +265,17 @@ export const HUD = () => {
     return () => document.removeEventListener('pointerlockchange', handlePointerLockChange);
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = (): void => setIsFullscreen(isFullscreenActive());
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = (): void => {
+    if (isFullscreenActive()) void document.exitFullscreen().catch(() => {});
+    else enterBrowserFullscreen();
+  };
+
   if (gameStatus !== 'PLAYING') return null;
   let weatherWarning: string | null = null;
   if (thermalPower < requirements.requiredThermal) weatherWarning = `Cold suit + CSA crops! [2] Heater needs ${Math.ceil(requirements.requiredThermal)}%`;
@@ -271,67 +285,114 @@ export const HUD = () => {
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-sans">
       <div className="helmet-visor-vignette absolute inset-0" />
-      {showFrost && <div className="visor-frost absolute inset-0"><Snowflake className="absolute top-20 left-3 h-5 w-5 text-cyan-100" aria-hidden="true" /></div>}
+      {showFrost && <div className="visor-frost absolute inset-0"><Snowflake className="absolute left-3 top-20 h-5 w-5 text-cyan-100" aria-hidden="true" /></div>}
       {showRadiation && <div className="radiation-static absolute inset-0" />}
 
-      <section aria-label="Suit and outpost vitals" className="absolute top-3 left-3 flex items-center gap-2 rounded-full border border-white/15 bg-slate-900/55 px-3 py-2 text-xs font-bold text-white/90 backdrop-blur-md md:gap-3 md:px-4 md:text-sm">
-        <Vital label="O₂" value={suitOxygenAndHeat} color={suitOxygenAndHeat < 45 ? 'bg-red-400' : 'bg-orange-300'} />
-        <span className="h-4 w-px bg-white/15" />
-        <Vital label="Shield" value={outpostIntegrity} color={outpostIntegrity < 45 ? 'bg-red-400' : 'bg-sky-300'} />
-        <span className="hidden text-amber-200 lg:inline">🧪 {sampleTubesCollected}</span>
-      </section>
-      <button type="button" data-ui-interactive onClick={toggleAudioMuted} aria-label={audioMuted ? 'Unmute NASA audio [M]' : 'Mute NASA audio [M]'} title="NASA audio · [M]" className="pointer-events-auto absolute top-14 left-3 flex h-8 w-8 touch-none select-none items-center justify-center rounded-full border border-white/15 bg-slate-900/55 text-white/85 backdrop-blur-md hover:bg-white/15">
-        {audioMuted ? <VolumeX className="h-4 w-4" aria-hidden="true" /> : <Volume2 className="h-4 w-4" aria-hidden="true" />}
-      </button>
-
-      <CompassRibbon />
-      <div className="absolute top-[88px] left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 text-center">
-        <div className="flex items-center justify-center gap-3 rounded-full border border-white/15 bg-slate-900/55 px-4 py-2 text-xs font-bold whitespace-nowrap backdrop-blur-md">
-          <span className="text-orange-300" title={KID_GLOSSARY.sol}>SOL {activeSol.sol}/5</span>
-          <span className="text-white/50">ANY 3:</span>
-          <Task complete={tasksCompleted.panelsCleaned}>☀️ Solar</Task>
-          <Task complete={tasksCompleted.cropsHarvested}>🌱 O₂</Task>
-          <Task complete={tasksCompleted.dishAligned}>📡 Radar</Task>
-          <Task complete={tasksCompleted.samplesAnalyzed > 0}>🤖 Sample</Task>
-        </div>
-        {stationPrompt && <p title={stationDefinition ? `${stationDefinition.marsTrekCoords}\n${stationDefinition.resourceName}: ${stationDefinition.resourceRole}${activeStation === 'HYDROPONICS' ? `\n${KID_GLOSSARY.hydroponics}` : ''}` : undefined} className="mt-2 inline-block rounded-full border border-white/15 bg-slate-900/70 px-4 py-1.5 text-sm font-bold text-white backdrop-blur-md">{stationPrompt}</p>}
-        {weatherWarning && <p title={thermalPower < requirements.requiredThermal ? KID_GLOSSARY.hydroponics : shieldSensorPower < requirements.requiredShield ? KID_GLOSSARY.radiation : undefined} role="alert" className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-slate-950"><AlertTriangle className="h-4 w-4" aria-hidden="true" />{weatherWarning}</p>}
+      <div className="absolute inset-0 origin-top-left" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <section aria-label="Suit and outpost vitals" className="absolute left-3 top-3 flex items-center gap-3 rounded-full border border-white/15 bg-slate-900/55 px-4 py-2 text-sm font-bold text-white/90 backdrop-blur-md">
+          <Vital label="O₂" value={suitOxygenAndHeat} color={suitOxygenAndHeat < 45 ? 'bg-red-400' : 'bg-orange-300'} />
+          <span className="h-4 w-px bg-white/15" />
+          <Vital label="Shield" value={outpostIntegrity} color={outpostIntegrity < 45 ? 'bg-red-400' : 'bg-sky-300'} />
+          <span className="text-amber-200">🧪 {sampleTubesCollected}</span>
+        </section>
+        <button type="button" data-ui-interactive onClick={() => triggerKeyAction('KeyM')} aria-label={audioMuted ? 'Unmute NASA audio [M]' : 'Mute NASA audio [M]'} title="NASA audio · [M]" className="pointer-events-auto absolute left-3 top-14 flex h-8 w-8 cursor-pointer touch-none select-none items-center justify-center rounded-full border border-white/15 bg-slate-900/55 text-white/85 backdrop-blur-md hover:bg-white/15 active:scale-95">
+          {audioMuted ? <VolumeX className="h-4 w-4" aria-hidden="true" /> : <Volume2 className="h-4 w-4" aria-hidden="true" />}
+        </button>
+        <button type="button" data-ui-interactive onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="pointer-events-auto absolute left-12 top-14 flex h-8 w-8 cursor-pointer touch-none select-none items-center justify-center rounded-full border border-white/15 bg-slate-900/55 text-lg leading-none text-white/85 backdrop-blur-md hover:bg-white/15 active:scale-95">
+          ⛶
+        </button>
       </div>
 
-      {cameraPov === 'FIRST_PERSON' && <div aria-label="First-person reticle" className="absolute top-1/2 left-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-sky-200/60"><Crosshair className="h-full w-full" aria-hidden="true" /></div>}
-      <p className="absolute bottom-36 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-slate-900/55 px-3 py-1 text-xs font-bold whitespace-nowrap text-white/75 backdrop-blur-md"><MousePointer2 className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" /> {isTouchDevice ? 'Swipe Mars to look around' : `Press [C] to Lock/Free Cursor${isPointerLocked ? ' · Locked' : ''}`}</p>
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex w-full items-end justify-between gap-2 px-3 pb-3 md:gap-4 md:px-6 md:pb-5">
-        <div aria-label="WASD movement controls" className="pointer-events-auto grid shrink-0 touch-none select-none grid-cols-3 gap-1.5 w-[132px] md:w-[156px] lg:w-[174px]">
-          <div aria-hidden="true" />
-          <Keycap label="W" virtualKey="w" pressed={pressed.w} />
-          <div aria-hidden="true" />
-          <Keycap label="A" virtualKey="a" pressed={pressed.a} />
-          <Keycap label="S" virtualKey="s" pressed={pressed.s} />
-          <Keycap label="D" virtualKey="d" pressed={pressed.d} />
-        </div>
-
-        <div className="flex min-w-0 justify-center px-0 md:px-2">
-          <div className="pointer-events-auto flex max-w-[calc(100vw-290px)] touch-none select-none flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/15 bg-slate-900/55 px-3 py-2 text-xs backdrop-blur-md md:max-w-fit md:rounded-full md:px-6 md:text-sm" aria-label="Actions and 110 watt power allocation">
-            <ActionPrompt icon="⚡" label="Interact" keyLabel="E" action="interact" pressed={pressed.e} />
-            <ActionPrompt icon="🏃" label="Jump" keyLabel="Space" action="jump" pressed={pressed.space} />
-            <ActionPrompt icon="💨" label="Sprint" keyLabel="Shift" action="sprint" pressed={pressed.shift} />
-            <ActionPrompt icon="🎥" label="POV" keyLabel="V" action="togglePov" pressed={pressed.v} />
-            <span className="hidden h-5 w-px shrink-0 bg-white/15 lg:block" />
-            <span className="hidden shrink-0 font-mono text-xs font-bold text-white/55 lg:inline">110W</span>
-            <PowerToggle system="thruster" icon="🚀" label="Speed" shortcut="1" value={thrusterPower} pressed={pressed.key1} />
-            <PowerToggle system="thermal" icon="🔥" label="Heater" shortcut="2" value={thermalPower} pressed={pressed.key2} />
-            <PowerToggle system="shieldSensor" icon="🛡️" label="Shield" shortcut="3" value={shieldSensorPower} pressed={pressed.key3} />
+      <div className="absolute inset-0 origin-top" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <CompassRibbon />
+        <div className="absolute left-1/2 top-[88px] -translate-x-1/2 text-center">
+          <div className="flex items-center justify-center gap-3 rounded-full border border-white/15 bg-slate-900/55 px-4 py-2 text-xs font-bold whitespace-nowrap backdrop-blur-md">
+            <span className="text-orange-300" title={KID_GLOSSARY.sol}>SOL {activeSol.sol}/5</span>
+            <span className="text-white/50">ANY 3:</span>
+            <Task complete={tasksCompleted.panelsCleaned}>☀️ Solar</Task>
+            <Task complete={tasksCompleted.cropsHarvested}>🌱 O₂</Task>
+            <Task complete={tasksCompleted.dishAligned}>📡 Radar</Task>
+            <Task complete={tasksCompleted.samplesAnalyzed > 0}>🤖 Sample</Task>
           </div>
+          {weatherWarning && <p title={thermalPower < requirements.requiredThermal ? KID_GLOSSARY.hydroponics : shieldSensorPower < requirements.requiredShield ? KID_GLOSSARY.radiation : undefined} role="alert" className={`${stationPrompt ? 'mt-12' : 'mt-2'} inline-flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-slate-950`}><AlertTriangle className="h-4 w-4" aria-hidden="true" />{weatherWarning}</p>}
         </div>
+      </div>
 
-        <div aria-label="Arrow movement controls" className="pointer-events-auto grid shrink-0 touch-none select-none grid-cols-3 gap-1.5 w-[132px] md:w-[156px] lg:w-[174px]">
+      {stationPrompt && (
+        <div className="absolute left-1/2 top-[132px] -translate-x-1/2">
+          <p
+            role="button"
+            tabIndex={0}
+            data-ui-interactive
+            title={stationDefinition ? `${stationDefinition.marsTrekCoords}\n${stationDefinition.resourceName}: ${stationDefinition.resourceRole}${activeStation === 'HYDROPONICS' ? `\n${KID_GLOSSARY.hydroponics}` : ''}` : undefined}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              triggerKeyAction('KeyE');
+            }}
+            onKeyDown={(event) => {
+              if (event.code === 'Enter') triggerKeyAction('KeyE');
+            }}
+            className="pointer-events-auto inline-block cursor-pointer touch-none select-none rounded-full border border-white/15 bg-slate-900/70 px-4 py-1.5 text-sm font-bold text-white backdrop-blur-md active:scale-95 origin-center"
+            style={{ transform: UI_SCALE_TRANSFORM }}
+          >
+            {stationPrompt}
+          </p>
+        </div>
+      )}
+
+      {cameraPov === 'FIRST_PERSON' && <div aria-label="First-person reticle" className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-sky-200/60"><Crosshair className="h-full w-full" aria-hidden="true" /></div>}
+
+      <div className="absolute inset-x-0 bottom-36 flex justify-center origin-bottom" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <p
+          role="button"
+          tabIndex={0}
+          data-ui-interactive
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            triggerKeyAction('KeyC');
+          }}
+          onKeyDown={(event) => {
+            if (event.code === 'Enter') triggerKeyAction('KeyC');
+          }}
+          className="pointer-events-auto cursor-pointer touch-none select-none rounded-full border border-white/15 bg-slate-900/55 px-3 py-1 text-xs font-bold whitespace-nowrap text-white/75 backdrop-blur-md active:scale-95"
+        >
+          <MousePointer2 className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" /> Press [C] to Lock/Free Cursor{isPointerLocked ? ' · Locked' : ''} · Drag to Look
+        </p>
+      </div>
+
+      <div className="absolute bottom-5 left-6 origin-bottom-left" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <div aria-label="WASD movement controls" className="pointer-events-auto grid w-[174px] shrink-0 touch-none select-none grid-cols-3 gap-1.5">
           <div aria-hidden="true" />
-          <Keycap label="↑" virtualKey="up" pressed={pressed.up} />
+          <Keycap label="W" virtualKey="forward" pressed={pressed.w} />
           <div aria-hidden="true" />
-          <Keycap label="←" virtualKey="left" pressed={pressed.left} />
-          <Keycap label="↓" virtualKey="down" pressed={pressed.down} />
-          <Keycap label="→" virtualKey="right" pressed={pressed.right} />
+          <Keycap label="A" virtualKey="left" pressed={pressed.a} />
+          <Keycap label="S" virtualKey="backward" pressed={pressed.s} />
+          <Keycap label="D" virtualKey="right" pressed={pressed.d} />
+        </div>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-5 flex justify-center origin-bottom" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <div className="pointer-events-auto flex max-w-fit touch-none select-none flex-nowrap items-center justify-center gap-1 rounded-full border border-white/15 bg-slate-900/55 px-6 py-2 text-sm backdrop-blur-md" aria-label="Actions and 110 watt power allocation">
+          <ActionPrompt icon="⚡" label="Interact" keyLabel="E" action="interact" pressed={pressed.e} />
+          <ActionPrompt icon="🏃" label="Jump" keyLabel="Space" action="jump" pressed={pressed.space} />
+          <ActionPrompt icon="💨" label="Sprint" keyLabel="Shift" action="sprint" pressed={pressed.shift} />
+          <ActionPrompt icon="🎥" label="POV" keyLabel="V" action="togglePov" pressed={pressed.v} />
+          <span className="block h-5 w-px shrink-0 bg-white/15" />
+          <span className="shrink-0 font-mono text-xs font-bold text-white/55">110W</span>
+          <PowerToggle system="thruster" icon="🚀" label="Speed" shortcut="1" value={thrusterPower} pressed={pressed.key1} />
+          <PowerToggle system="thermal" icon="🔥" label="Heater" shortcut="2" value={thermalPower} pressed={pressed.key2} />
+          <PowerToggle system="shieldSensor" icon="🛡️" label="Shield" shortcut="3" value={shieldSensorPower} pressed={pressed.key3} />
+        </div>
+      </div>
+
+      <div className="absolute bottom-5 right-6 origin-bottom-right" style={{ transform: UI_SCALE_TRANSFORM }}>
+        <div aria-label="Arrow movement controls" className="pointer-events-auto grid w-[174px] shrink-0 touch-none select-none grid-cols-3 gap-1.5">
+          <div aria-hidden="true" />
+          <Keycap label="↑" virtualKey="arrowUp" pressed={pressed.up} />
+          <div aria-hidden="true" />
+          <Keycap label="←" virtualKey="arrowLeft" pressed={pressed.left} />
+          <Keycap label="↓" virtualKey="arrowDown" pressed={pressed.down} />
+          <Keycap label="→" virtualKey="arrowRight" pressed={pressed.right} />
         </div>
       </div>
     </div>

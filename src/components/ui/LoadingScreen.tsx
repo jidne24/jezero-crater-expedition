@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useProgress } from '@react-three/drei';
 import {
+  enterBrowserFullscreen,
+  isMobileOrTablet,
+  isPortraitOrientation,
+} from '../../utils/deviceUtils';
+import {
   SCENE_GPU_READY_EVENT,
   isSceneGpuReady,
 } from '../../utils/sceneReadiness';
@@ -22,19 +27,108 @@ const OrbitalTitle = () => (
   </div>
 );
 
-export const LoadingScreen = () => {
+const LandscapeOrientationGate = () => (
+  <div
+    className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#060a12] p-6 text-center"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="orientation-gate-title"
+    data-orientation-gate
+    onPointerDownCapture={enterBrowserFullscreen}
+    onMouseDownCapture={enterBrowserFullscreen}
+    onTouchStartCapture={enterBrowserFullscreen}
+    onKeyDownCapture={enterBrowserFullscreen}
+  >
+    <svg viewBox="0 0 200 200" className="mb-5 h-36 w-36 sm:h-44 sm:w-44" role="img" aria-label="A phone rotating from portrait to landscape">
+      <defs>
+        <linearGradient id="orientation-screen" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#38bdf8" />
+          <stop offset="1" stopColor="#1e1b4b" />
+        </linearGradient>
+      </defs>
+      <circle cx="100" cy="100" r="83" fill="none" stroke="#38bdf8" strokeOpacity="0.25" strokeWidth="2" />
+      <ellipse cx="100" cy="100" rx="88" ry="42" fill="none" stroke="#fbbf24" strokeOpacity="0.45" strokeWidth="2" strokeDasharray="4 8" transform="rotate(-25 100 100)" />
+      <circle cx="24" cy="139" r="5" fill="#fbbf24" />
+      <g className="orientation-device">
+        <rect x="69" y="46" width="62" height="108" rx="12" fill="#0f172a" stroke="#e0f2fe" strokeWidth="4" />
+        <rect x="76" y="58" width="48" height="79" rx="5" fill="url(#orientation-screen)" />
+        <circle cx="100" cy="146" r="3" fill="#bae6fd" />
+        <path d="M89 97 100 87 111 97M100 87V119M89 108 100 119 111 108" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+      </g>
+      <path d="M150 55A73 73 0 0 1 172 112" fill="none" stroke="#fb923c" strokeWidth="4" strokeLinecap="round" />
+      <path d="m164 103 9 12 7-13" fill="none" stroke="#fb923c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    <h1 id="orientation-gate-title" className="font-display text-2xl font-bold tracking-wide text-white sm:text-3xl">🪐 JEZERO CRATER EXPEDITION</h1>
+    <p className="mt-4 max-w-lg text-base font-semibold leading-relaxed text-sky-100/85 sm:text-lg">
+      Welcome, Future Astronaut! Please switch your phone or tablet to Landscape Mode for the best Junior Astronaut Mars experience.
+    </p>
+    <button
+      type="button"
+      onClick={() => void enterBrowserFullscreen()}
+      className="mt-6 cursor-pointer rounded-full border border-cyan-100/35 bg-cyan-400/15 px-6 py-3 text-sm font-extrabold text-cyan-50 shadow-[0_0_28px_rgba(34,211,238,0.12)] backdrop-blur-md transition-colors hover:bg-cyan-400/25 sm:text-base"
+    >
+      ⛶ Rotate &amp; Enter Fullscreen
+    </button>
+    <p className="mt-4 text-xs font-semibold text-white/45">Your mission will continue in Landscape Mode.</p>
+  </div>
+);
+
+export const LoadingScreen = ({ onComplete }: { onComplete: () => void }) => {
   const { active, progress } = useProgress();
   const [displayPercent, setDisplayPercent] = useState(0);
   const [smoothT, setSmoothT] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
   const [isMounted, setIsMounted] = useState(true);
+  const [deviceOrientation, setDeviceOrientation] = useState(() => ({
+    isMobile: isMobileOrTablet(),
+    isPortrait: isPortraitOrientation(),
+  }));
   const continuousProgressRef = useRef(0);
   const displayedPercentRef = useRef(0);
   const transferPathRef = useRef<SVGPathElement>(null);
   const spacecraftRef = useRef<SVGGElement>(null);
   const assetsReadyRef = useRef(false);
   const gpuReadyRef = useRef(isSceneGpuReady());
+  const completionNotifiedRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  const shouldShowOrientationGate = deviceOrientation.isMobile && deviceOrientation.isPortrait;
+  const orientationBlockedRef = useRef(shouldShowOrientationGate);
   const assetsReady = !active && progress >= 100;
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    enterBrowserFullscreen();
+    if (!isMounted && !shouldShowOrientationGate) return;
+    const handleFullscreenInteraction = (): void => enterBrowserFullscreen();
+    const events = ['pointerdown', 'mousedown', 'touchstart', 'keydown'] as const;
+    for (const event of events) window.addEventListener(event, handleFullscreenInteraction, true);
+    return () => {
+      for (const event of events) window.removeEventListener(event, handleFullscreenInteraction, true);
+    };
+  }, [isMounted, shouldShowOrientationGate]);
+
+  useEffect(() => {
+    const wasBlocked = orientationBlockedRef.current;
+    orientationBlockedRef.current = shouldShowOrientationGate;
+    if (wasBlocked && !shouldShowOrientationGate) enterBrowserFullscreen();
+  }, [shouldShowOrientationGate]);
+
+  useEffect(() => {
+    const updateDeviceOrientation = (): void => {
+      const next = { isMobile: isMobileOrTablet(), isPortrait: isPortraitOrientation() };
+      setDeviceOrientation((current) => current.isMobile === next.isMobile && current.isPortrait === next.isPortrait ? current : next);
+    };
+    updateDeviceOrientation();
+    window.addEventListener('resize', updateDeviceOrientation);
+    window.addEventListener('orientationchange', updateDeviceOrientation);
+    return () => {
+      window.removeEventListener('resize', updateDeviceOrientation);
+      window.removeEventListener('orientationchange', updateDeviceOrientation);
+    };
+  }, []);
 
   useEffect(() => {
     assetsReadyRef.current = assetsReady;
@@ -59,6 +153,10 @@ export const LoadingScreen = () => {
     const animate = (now: number) => {
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
+      if (orientationBlockedRef.current) {
+        animationFrame = requestAnimationFrame(animate);
+        return;
+      }
       const fullyReady = assetsReadyRef.current && gpuReadyRef.current;
       const currentProgress = continuousProgressRef.current;
       const rate = fullyReady ? 42 : currentProgress > 90 ? 6 : 36;
@@ -73,6 +171,10 @@ export const LoadingScreen = () => {
       }
 
       if (displayedPercentRef.current === 100) {
+        if (!completionNotifiedRef.current) {
+          completionNotifiedRef.current = true;
+          onCompleteRef.current();
+        }
         if (hundredReachedAt === null) hundredReachedAt = now;
         if (now - hundredReachedAt >= REVEAL_HOLD_MS && !revealStarted) {
           revealStarted = true;
@@ -103,8 +205,9 @@ export const LoadingScreen = () => {
     const direction = distance < pathLength ? 1 : -1;
     const angle = Math.atan2((reference.y - point.y) * direction, (reference.x - point.x) * direction) * 180 / Math.PI;
     spacecraft.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})`);
-  }, [smoothT]);
+  }, [smoothT, shouldShowOrientationGate]);
 
+  if (shouldShowOrientationGate) return <LandscapeOrientationGate />;
   if (!isMounted) return null;
 
   return (
@@ -114,6 +217,10 @@ export const LoadingScreen = () => {
       data-progress={displayPercent}
       data-revealing={isRevealing}
       aria-label="Preparing the Jezero Crater Expedition"
+      onPointerDownCapture={enterBrowserFullscreen}
+      onMouseDownCapture={enterBrowserFullscreen}
+      onTouchStartCapture={enterBrowserFullscreen}
+      onKeyDownCapture={enterBrowserFullscreen}
     >
       <div aria-hidden="true" className={`airlock-shutter absolute inset-x-0 top-0 h-1/2 bg-[#060a12] transition-transform duration-[450ms] ease-in-out ${isRevealing ? '-translate-y-full' : 'translate-y-0'}`} />
       <div aria-hidden="true" className={`airlock-shutter absolute inset-x-0 bottom-0 h-1/2 bg-[#060a12] transition-transform duration-[450ms] ease-in-out ${isRevealing ? 'translate-y-full' : 'translate-y-0'}`} />

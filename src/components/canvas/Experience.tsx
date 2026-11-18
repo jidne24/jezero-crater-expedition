@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Preload, useGLTF } from '@react-three/drei';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { useGameStore } from '../../store/useGameStore';
+import { isMobileOrTablet } from '../../utils/deviceUtils';
 import {
   markSceneGpuReady,
   resetSceneGpuReady,
@@ -20,6 +21,8 @@ import { WeatherEnvironment } from './WeatherEnvironment';
 
 useGLTF.preload('/models/astronaut.glb');
 useGLTF.preload('/models/perseverance.glb');
+
+const IS_MOBILE_OR_TABLET = isMobileOrTablet();
 
 const GpuSceneWarmup = ({ onReady }: { onReady: () => void }) => {
   const { gl, scene, camera } = useThree();
@@ -95,12 +98,6 @@ export const Experience = () => {
   }, [isVictory]);
 
   useEffect(() => {
-    void useGameStore.getState().loadNasaData().catch((error: unknown) => {
-      console.error('NASA telemetry could not be loaded; using the built-in Sol data.', error);
-    });
-  }, []);
-
-  useEffect(() => {
     if (gameStatus !== 'PLAYING') {
       stopMarsAmbientSoundscape();
       return;
@@ -112,7 +109,18 @@ export const Experience = () => {
   useEffect(() => () => stopMarsAmbientSoundscape(), []);
 
   return (
-    <Canvas shadows camera={{ position: [0, 8, 16], fov: 50 }} className="w-full h-full touch-none">
+    <Canvas
+      dpr={IS_MOBILE_OR_TABLET ? [1, 1.25] : [1, 1.75]}
+      shadows={!IS_MOBILE_OR_TABLET}
+      gl={{
+        antialias: !IS_MOBILE_OR_TABLET,
+        powerPreference: 'high-performance',
+        alpha: false,
+        stencil: false,
+      }}
+      camera={{ position: [0, 8, 16], fov: 50 }}
+      className="w-full h-full touch-none"
+    >
       <Suspense fallback={null}>
         <SimulationTicker />
         {isMenu ? <OnboardingCutscene /> : null}

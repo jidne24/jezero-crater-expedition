@@ -1,5 +1,12 @@
 import type { NasaDataset, SolTelemetry, VisualEnvironment } from '../store/useGameStore';
 
+export const NASA_API_KEY: string =
+  (typeof import.meta !== 'undefined' &&
+    import.meta.env &&
+    typeof import.meta.env.VITE_NASA_API_KEY === 'string' &&
+    import.meta.env.VITE_NASA_API_KEY.trim() !== '')
+    ? import.meta.env.VITE_NASA_API_KEY.trim()
+    : 'DEMO_KEY';
 export const CURATED_DATA_SOURCE_LABEL = 'Curated Real NASA & CSA Dataset (PDS MEDA • DONKI • RadLab • OSDR • Mars Trek)';
 export const LIVE_DATA_SOURCE_LABEL = '🟢 Live NASA Open API Connected';
 export const MARS_ROVER_PHOTO = {
@@ -495,8 +502,8 @@ const readLiveOsdrStudy = (value: unknown): { id: string; title: string } | null
   return null;
 };
 
-export const syncLiveNasaOpenApis = async (apiKey = 'DEMO_KEY'): Promise<LiveNasaSyncResult> => {
-  const key = encodeURIComponent(apiKey.trim() || 'DEMO_KEY');
+export const syncLiveNasaOpenApis = async (apiKey: string = NASA_API_KEY): Promise<LiveNasaSyncResult> => {
+  const key = encodeURIComponent(apiKey.trim() || NASA_API_KEY);
   const endpoints = [
     { name: 'DONKI FLR', url: `https://api.nasa.gov/DONKI/FLR?api_key=${key}` },
     { name: 'NASA APOD', url: `https://api.nasa.gov/planetary/apod?api_key=${key}` },

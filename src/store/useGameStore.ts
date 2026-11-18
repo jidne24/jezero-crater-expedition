@@ -5,6 +5,7 @@ import {
   getSolResourceContext,
   LIVE_DATA_SOURCE_LABEL,
   MARS_ROVER_PHOTO,
+  NASA_API_KEY,
   parseNasaDataset,
   randomizeMissionSols,
   syncLiveNasaOpenApis,
@@ -514,7 +515,7 @@ export const useGameStore = create<GameStoreState>()((set, get) => ({
     });
   },
 
-  syncLiveNasaApis: async (apiKey = 'DEMO_KEY') => {
+  syncLiveNasaApis: async (apiKey: string = NASA_API_KEY) => {
     if (get().isLiveSyncing) return;
     set({ isLiveSyncing: true, liveSyncMessage: 'Contacting DONKI, APOD, and OSDR in parallel…' });
     try {

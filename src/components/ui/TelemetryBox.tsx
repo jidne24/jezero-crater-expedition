@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Database, FileUp, RefreshCw, Shuffle } from 'lucide-react';
+import { triggerKeyAction } from '../../hooks/useKeyboard';
 import { getAvailablePowerWatts, getPowerRequirements, SAMPLE_SCIENCE, useGameStore } from '../../store/useGameStore';
 import type { MarsPhoto } from '../../store/useGameStore';
 import {
@@ -9,6 +10,7 @@ import {
   KID_GLOSSARY,
   LIVE_DATA_SOURCE_LABEL,
   MARS_ROVER_PHOTO,
+  NASA_API_KEY,
   OFFICIAL_CHALLENGE_RESOURCES,
 } from '../../utils/nasaDataEngine';
 
@@ -191,12 +193,12 @@ export const TelemetryBox = () => {
   ];
 
   return (
-    <div className="pointer-events-none absolute top-3 right-3 z-30 flex flex-col items-end gap-3">
+    <div className="pointer-events-none absolute right-3 top-3 z-30 flex origin-top-right flex-col items-end gap-3" style={{ transform: 'scale(var(--ui-scale, 1))' }}>
       <aside
         aria-label="Mars weather and science guide"
         className={isExpanded
-          ? 'pointer-events-auto max-h-[72dvh] w-[92vw] max-w-md overflow-y-auto rounded-2xl border border-white/20 bg-slate-950/90 p-4 text-white shadow-2xl backdrop-blur-md'
-          : 'pointer-events-auto w-52 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/15 bg-slate-900/55 text-xs text-white backdrop-blur-md md:w-64 md:text-sm'}
+          ? 'pointer-events-auto max-h-[72dvh] w-[28rem] overflow-y-auto rounded-2xl border border-white/20 bg-slate-950/90 p-4 text-white shadow-2xl backdrop-blur-md'
+          : 'pointer-events-auto w-64 rounded-2xl border border-white/15 bg-slate-900/55 text-sm text-white backdrop-blur-md'}
       >
         <div className={`${isExpanded ? '' : 'border-b border-white/10 px-3 py-2'} flex items-center justify-between gap-2`}>
           <span className="font-display text-sm font-bold text-white">🪐 MARS WEATHER</span>
@@ -260,6 +262,9 @@ export const TelemetryBox = () => {
                   <h3 className="flex items-center gap-2 font-display text-lg font-bold text-amber-200"><Database className="h-5 w-5" aria-hidden="true" /> Judge Data Dossier</h3>
                   <div className={`mt-2 inline-flex rounded-full border px-3 py-1.5 text-[11px] font-bold ${isLive ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-sky-300/30 bg-sky-400/10 text-sky-200'}`}>
                     {isLive ? LIVE_DATA_SOURCE_LABEL : CURATED_DATA_SOURCE_LABEL}
+                  </div>
+                  <div className="mt-2 inline-flex rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-white/60">
+                    {NASA_API_KEY !== 'DEMO_KEY' ? '🔑 Custom NASA API Key Active' : '🔑 NASA Demo Key'}
                   </div>
                   {sourceDetails && <p className="mt-2 break-words text-[11px] leading-relaxed text-white/55">{sourceDetails}</p>}
                   <p className="mt-2 text-xs leading-relaxed text-white/65">Bundled Sols are curated training scenarios, not live measurements. Live sync updates only returned DONKI, APOD, and OSDR metadata.</p>
@@ -336,13 +341,13 @@ export const TelemetryBox = () => {
           </div>
         )}
 
-        <button type="button" aria-expanded={isExpanded} aria-controls="nasa-pds-telemetry" onClick={() => setIsExpanded((expanded) => !expanded)} className={`${isExpanded ? 'sticky bottom-0 mt-3 rounded-xl border border-white/15' : 'border-t border-white/10'} flex w-full shrink-0 cursor-pointer items-center justify-center gap-1 bg-slate-900/95 px-2 py-2.5 text-xs font-bold text-sky-200 backdrop-blur-md hover:bg-slate-800/95`}>
+        <button type="button" aria-expanded={isExpanded} aria-controls="nasa-pds-telemetry" onClick={() => triggerKeyAction('KeyT')} className={`${isExpanded ? 'sticky bottom-0 mt-3 rounded-xl border border-white/15' : 'border-t border-white/10'} flex w-full shrink-0 cursor-pointer touch-none select-none items-center justify-center gap-1 bg-slate-900/95 px-2 py-2.5 text-xs font-bold text-sky-200 backdrop-blur-md hover:bg-slate-800/95 active:scale-95`}>
           {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
           {isExpanded ? 'Close Mars Guide [T]' : '📖 Mars Kid Guide & NASA Data [T]'}
         </button>
       </aside>
       {sampleNoticeId > 0 && (
-        <div key={sampleNoticeId} className="sample-toast max-w-sm rounded-2xl border border-white/20 bg-slate-900/70 px-4 py-3 text-sm font-bold text-amber-200 backdrop-blur-md" aria-live="polite">
+        <div key={sampleNoticeId} className="sample-toast pointer-events-auto max-w-sm rounded-2xl border border-white/20 bg-slate-900/70 px-4 py-3 text-sm font-bold text-amber-200 backdrop-blur-md" aria-live="polite">
           <div>+1 Mars Sample!</div>
           {lastSampleFact && <p className="mt-1 text-xs leading-relaxed font-semibold text-white/85">{lastSampleFact}</p>}
           <div className="mt-3">

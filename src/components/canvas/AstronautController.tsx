@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { keyboardState } from '../../hooks/useKeyboard';
 import { getPowerRequirements, useGameStore } from '../../store/useGameStore';
 import type { PowerSystem } from '../../store/useGameStore';
+import { isMobileOrTablet } from '../../utils/deviceUtils';
 import { publishNavigationTelemetry } from '../../utils/navigationTelemetry';
 import {
   getWalkableSurfaceHeight,
@@ -154,12 +155,17 @@ export const AstronautController = () => {
   const selectedPowerRef = useRef<PowerSystem>('thruster');
   const alternateInteractRef = useRef(false);
   const gameStatus = useGameStore((state) => state.gameStatus);
+  const cameraPov = useGameStore((state) => state.cameraPov);
   const carriedSampleCount = useGameStore((state) => state.carriedSamples);
   const showCommander = gameStatus === 'GAME_OVER' || gameStatus === 'SOL_COMPLETE';
 
   useEffect(() => {
+    cameraInitializedRef.current = false;
+  }, [cameraPov]);
+
+  useEffect(() => {
     const requestCameraLock = (): void => {
-      if (performance.now() - lastTouchTime.current < 500) return;
+      if (isMobileOrTablet() || performance.now() - lastTouchTime.current < 500) return;
       if (
         useGameStore.getState().gameStatus === 'PLAYING' &&
         document.pointerLockElement !== gl.domElement
@@ -168,7 +174,7 @@ export const AstronautController = () => {
       }
     };
     const toggleCursorLock = (): void => {
-      if (useGameStore.getState().gameStatus !== 'PLAYING') return;
+      if (isMobileOrTablet() || useGameStore.getState().gameStatus !== 'PLAYING') return;
       if (document.pointerLockElement) void document.exitPointerLock();
       else void gl.domElement.requestPointerLock();
     };
@@ -194,43 +200,35 @@ export const AstronautController = () => {
         useGameStore.getState().allocatePower(selectedPowerRef.current, event.deltaY > 0 ? -5 : 5);
       }
     };
-    const handleTouchStart = (event: TouchEvent): void => {
+    const handleScenePointerDown = (event: PointerEvent): void => {
       lastTouchTime.current = performance.now();
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (document.pointerLockElement === gl.domElement) return;
       if (useGameStore.getState().gameStatus !== 'PLAYING' || cameraTouchId.current !== null) return;
-      const touch = event.changedTouches[0];
-      if (!touch) return;
       event.preventDefault();
-      cameraTouchId.current = touch.identifier;
-      cameraTouchX.current = touch.clientX;
-      cameraTouchY.current = touch.clientY;
+      cameraTouchId.current = event.pointerId;
+      cameraTouchX.current = event.clientX;
+      cameraTouchY.current = event.clientY;
+      gl.domElement.setPointerCapture(event.pointerId);
     };
-    const handleTouchMove = (event: TouchEvent): void => {
-      if (cameraTouchId.current === null || useGameStore.getState().gameStatus !== 'PLAYING') return;
-      for (let index = 0; index < event.changedTouches.length; index += 1) {
-        const touch = event.changedTouches[index]!;
-        if (touch.identifier !== cameraTouchId.current) continue;
-        lastTouchTime.current = performance.now();
-        event.preventDefault();
-        const deltaX = touch.clientX - cameraTouchX.current;
-        const deltaY = touch.clientY - cameraTouchY.current;
-        cameraYawTarget.current -= deltaX * 0.0045;
-        cameraPitchTarget.current = THREE.MathUtils.clamp(
-          cameraPitchTarget.current + deltaY * 0.0035,
-          -0.15,
-          0.95,
-        );
-        cameraTouchX.current = touch.clientX;
-        cameraTouchY.current = touch.clientY;
-        break;
-      }
+    const handleScenePointerMove = (event: PointerEvent): void => {
+      if (cameraTouchId.current !== event.pointerId || useGameStore.getState().gameStatus !== 'PLAYING') return;
+      if (document.pointerLockElement === gl.domElement) return;
+      lastTouchTime.current = performance.now();
+      event.preventDefault();
+      const deltaX = event.clientX - cameraTouchX.current;
+      const deltaY = event.clientY - cameraTouchY.current;
+      cameraYawTarget.current -= deltaX * 0.0045;
+      cameraPitchTarget.current = THREE.MathUtils.clamp(
+        cameraPitchTarget.current + deltaY * 0.0035,
+        -0.15,
+        0.95,
+      );
+      cameraTouchX.current = event.clientX;
+      cameraTouchY.current = event.clientY;
     };
-    const handleTouchEnd = (event: TouchEvent): void => {
-      for (let index = 0; index < event.changedTouches.length; index += 1) {
-        if (event.changedTouches[index]!.identifier === cameraTouchId.current) {
-          cameraTouchId.current = null;
-          break;
-        }
-      }
+    const handleScenePointerEnd = (event: PointerEvent): void => {
+      if (cameraTouchId.current === event.pointerId) cameraTouchId.current = null;
     };
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.code === 'KeyC' && !event.repeat) {
@@ -254,10 +252,10 @@ export const AstronautController = () => {
     };
 
     gl.domElement.addEventListener('click', requestCameraLock);
-    gl.domElement.addEventListener('touchstart', handleTouchStart, { passive: false });
-    gl.domElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-    gl.domElement.addEventListener('touchend', handleTouchEnd);
-    gl.domElement.addEventListener('touchcancel', handleTouchEnd);
+    gl.domElement.addEventListener('pointerdown', handleScenePointerDown);
+    gl.domElement.addEventListener('pointermove', handleScenePointerMove);
+    gl.domElement.addEventListener('pointerup', handleScenePointerEnd);
+    gl.domElement.addEventListener('pointercancel', handleScenePointerEnd);
     document.addEventListener('pointerlockchange', handlePointerLockChange);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('wheel', handleWheel, { passive: false });
@@ -265,10 +263,10 @@ export const AstronautController = () => {
     window.addEventListener('keyup', handleKeyUp);
     return () => {
       gl.domElement.removeEventListener('click', requestCameraLock);
-      gl.domElement.removeEventListener('touchstart', handleTouchStart);
-      gl.domElement.removeEventListener('touchmove', handleTouchMove);
-      gl.domElement.removeEventListener('touchend', handleTouchEnd);
-      gl.domElement.removeEventListener('touchcancel', handleTouchEnd);
+      gl.domElement.removeEventListener('pointerdown', handleScenePointerDown);
+      gl.domElement.removeEventListener('pointermove', handleScenePointerMove);
+      gl.domElement.removeEventListener('pointerup', handleScenePointerEnd);
+      gl.domElement.removeEventListener('pointercancel', handleScenePointerEnd);
       cameraTouchId.current = null;
       document.removeEventListener('pointerlockchange', handlePointerLockChange);
       window.removeEventListener('mousemove', handleMouseMove);
@@ -446,12 +444,13 @@ export const AstronautController = () => {
       );
     }
 
-    if (isPlaying && keyboardState.jump && !jumpWasHeld.current && jumpOffset.current <= 0.001 && jumpPhase.current === 'NONE') {
+    const jumpHeld = isPlaying && keyboardState.jump;
+    if (jumpHeld && !jumpWasHeld.current && jumpOffset.current <= 0.001 && jumpPhase.current === 'NONE') {
       jumpPhase.current = 'PRE_JUMP';
       phaseElapsed.current = 0;
       verticalVelocity.current = 0;
     }
-    jumpWasHeld.current = isPlaying && keyboardState.jump;
+    jumpWasHeld.current = jumpHeld;
     if (jumpPhase.current === 'PRE_JUMP') {
       phaseElapsed.current += frameDelta;
       if (phaseElapsed.current >= 0.12) {

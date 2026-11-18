@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getRecommendedPowerSplit, useGameStore } from '../../store/useGameStore';
 import type { OnboardingStage, PowerSystem } from '../../store/useGameStore';
+import { enterBrowserFullscreen, isMobileOrTablet } from '../../utils/deviceUtils';
 import { playUiClick, playVictoryFanfare, speakDialogue, stopDialogue } from '../../utils/soundEngine';
 
 const MENU_DIALOGUE = [
@@ -63,18 +64,21 @@ const VICTORY_CAPTIONS = {
 } as const;
 
 const RPG_ACTION_CLASS =
-  'cursor-pointer rounded-lg border border-white/40 bg-slate-900/90 px-4 py-1.5 text-sm font-bold text-white transition-colors hover:bg-white hover:text-slate-950 md:text-base';
+  'cursor-pointer rounded-lg border border-white/40 bg-slate-900/90 px-4 py-1.5 text-base font-bold text-white transition-colors hover:bg-white hover:text-slate-950 active:scale-95';
 
 const CutsceneCaption = ({ children }: { children: string }) => (
-  <div className="pointer-events-none fixed bottom-6 left-1/2 z-30 w-[92vw] max-w-2xl -translate-x-1/2 text-center">
-    <div role="status" aria-live="polite" className="rounded-xl border border-white/25 bg-slate-950/75 px-6 py-2.5 text-base font-semibold text-white backdrop-blur-md">
-      {children}
+  <div className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex origin-bottom justify-center" style={{ transform: 'scale(var(--ui-scale, 1))' }}>
+    <div className="w-[42rem] text-center">
+      <div role="status" aria-live="polite" className="rounded-xl border border-white/25 bg-slate-950/75 px-6 py-2.5 text-base font-semibold text-white backdrop-blur-md">
+        {children}
+      </div>
     </div>
   </div>
 );
 
 const requestGameplayPointerLock = (): void => {
   playUiClick();
+  if (isMobileOrTablet()) return;
   const canvas = document.querySelector('canvas');
   if (!canvas || document.pointerLockElement === canvas) return;
   try {
@@ -89,13 +93,15 @@ const RpgDialogueBox = ({ speaker, isCommander = true, children, actions }: {
   children: ReactNode;
   actions?: ReactNode;
 }) => (
-  <div role="dialog" aria-modal="true" aria-label={speaker} className="fixed bottom-6 left-1/2 z-30 w-[92vw] max-w-2xl -translate-x-1/2">
-    <div className={`flex ${isCommander ? 'justify-start' : 'justify-end'}`}>
-      <div className={`inline-block rounded-t-xl border-t-2 border-x-2 border-white/30 bg-slate-950/85 px-4 py-1.5 text-base font-bold ${isCommander ? 'text-amber-300' : 'text-sky-300'}`}>{speaker}</div>
-    </div>
-    <div className={`max-h-[82dvh] overflow-y-auto rounded-b-2xl border-2 border-white/30 bg-slate-950/80 p-5 text-white backdrop-blur-md ${isCommander ? 'rounded-tr-2xl rounded-tl-none' : 'rounded-tl-2xl rounded-tr-none'}`}>
-      <div className="text-lg font-semibold leading-snug md:text-xl">{children}</div>
-      {actions && <div className="mt-4 flex flex-wrap justify-end gap-2">{actions}</div>}
+  <div role="dialog" aria-modal="true" aria-label={speaker} className="fixed inset-x-0 bottom-6 z-30 flex origin-bottom justify-center" style={{ transform: 'scale(var(--ui-scale, 1))' }}>
+    <div className="w-[42rem]">
+      <div className={`flex ${isCommander ? 'justify-start' : 'justify-end'}`}>
+        <div className={`inline-block rounded-t-xl border-t-2 border-x-2 border-white/30 bg-slate-950/85 px-4 py-1.5 text-base font-bold ${isCommander ? 'text-amber-300' : 'text-sky-300'}`}>{speaker}</div>
+      </div>
+      <div className={`max-h-[82dvh] overflow-y-auto rounded-b-2xl border-2 border-white/30 bg-slate-950/80 p-5 text-white backdrop-blur-md ${isCommander ? 'rounded-tr-2xl rounded-tl-none' : 'rounded-tl-2xl rounded-tr-none'}`}>
+        <div className="text-xl font-semibold leading-snug">{children}</div>
+        {actions && <div className="mt-4 flex flex-wrap justify-end gap-2">{actions}</div>}
+      </div>
     </div>
   </div>
 );
@@ -197,33 +203,34 @@ export const DebriefModal = () => {
 
   if (isMenu && onboardingPhase === 'TITLE_SCREEN') {
     return (
-      <section aria-labelledby="game-title" className="pointer-events-none fixed inset-y-0 left-0 z-20 flex max-w-xl select-none flex-col justify-center pl-8 md:pl-16 lg:pl-24">
+      <section aria-labelledby="game-title" className="pointer-events-none fixed inset-y-0 left-0 z-20 flex max-w-xl origin-left select-none flex-col justify-center pl-24" style={{ transform: 'scale(var(--ui-scale, 1))' }}>
         <h1 id="game-title" className="mt-1 leading-none tracking-tight">
-          <span className="game-title-3d relative block text-5xl md:text-6xl lg:text-7xl">
+          <span className="game-title-3d relative block text-7xl">
             <span aria-hidden="true">JEZERO</span>
             <span className="game-title-face" style={{ backgroundImage: 'linear-gradient(180deg, #bae6fd 0%, #38bdf8 50%, #0284c7 100%)' }}>JEZERO</span>
           </span>
-          <span className="game-title-3d relative mt-1 block text-5xl md:text-6xl lg:text-7xl">
+          <span className="game-title-3d relative mt-1 block text-7xl">
             <span aria-hidden="true">CRATER</span>
             <span className="game-title-face" style={{ backgroundImage: 'linear-gradient(180deg, #fef08a 0%, #fb923c 50%, #ea580c 100%)' }}>CRATER</span>
           </span>
-          <span className="game-title-3d game-title-small relative mt-1 block text-4xl md:text-5xl lg:text-6xl">
+          <span className="game-title-3d game-title-small relative mt-1 block text-6xl">
             <span aria-hidden="true">EXPEDITION</span>
             <span className="game-title-face" style={{ backgroundImage: 'linear-gradient(180deg, #bae6fd 0%, #38bdf8 50%, #0284c7 100%)' }}>EXPEDITION</span>
           </span>
         </h1>
-        <div className="mb-7 mt-4 w-fit whitespace-nowrap rounded-full border border-white/15 bg-slate-950/55 px-4 py-1.5 text-sm font-bold text-white/95 backdrop-blur-md md:text-base">
+        <div className="mb-7 mt-4 w-fit whitespace-nowrap rounded-full border border-white/15 bg-slate-950/55 px-4 py-1.5 text-base font-bold text-white/95 backdrop-blur-md">
           👩‍🚀 Survive 5 Real Martian Sols • Powered by Official NASA &amp; CSA Data
         </div>
         <button
           type="button"
           autoFocus
           onClick={() => {
+            enterBrowserFullscreen();
             playUiClick();
             setDialogueLine(0);
             setOnboardingPhase('PRE_FLIGHT_DIALOGUE');
           }}
-          className="group relative inline-flex w-fit max-w-[calc(100vw-3rem)] cursor-pointer items-center gap-3.5 rounded-2xl border-2 border-white/35 bg-gradient-to-b from-[#ff5136] to-[#e02f12] px-8 py-4 text-lg font-extrabold tracking-wide text-white shadow-[0_6px_0_#8f1d09,0_12px_20px_rgba(0,0,0,0.35)] transition-all duration-100 hover:from-[#ff634b] hover:to-[#fc3d21] active:translate-y-[4px] active:shadow-[0_2px_0_#8f1d09] pointer-events-auto"
+          className="group relative inline-flex w-fit cursor-pointer items-center gap-3.5 whitespace-nowrap rounded-2xl border-2 border-white/35 bg-gradient-to-b from-[#ff5136] to-[#e02f12] px-8 py-4 text-xl font-extrabold tracking-wide text-white shadow-[0_6px_0_#8f1d09,0_12px_20px_rgba(0,0,0,0.35)] transition-all duration-100 hover:from-[#ff634b] hover:to-[#fc3d21] active:translate-y-[4px] active:shadow-[0_2px_0_#8f1d09] pointer-events-auto"
         >
           <span aria-hidden="true" className="pointer-events-none absolute inset-[2px] rounded-[13px] border-t border-white/25" />
           <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/30 bg-white/15">
@@ -285,7 +292,7 @@ export const DebriefModal = () => {
               setVictoryDialogueLine(0);
               returnToLaunchComplex();
             }}
-            className="group inline-flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-white/35 bg-gradient-to-b from-[#ff5136] to-[#e02f12] px-6 py-3 text-base font-extrabold tracking-wide text-white shadow-[0_5px_0_#8f1d09,0_10px_18px_rgba(0,0,0,0.3)] transition-all duration-100 hover:from-[#ff634b] hover:to-[#fc3d21] active:translate-y-[3px] active:shadow-[0_2px_0_#8f1d09] md:text-lg"
+            className="group inline-flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-white/35 bg-gradient-to-b from-[#ff5136] to-[#e02f12] px-6 py-3 text-lg font-extrabold tracking-wide text-white shadow-[0_5px_0_#8f1d09,0_10px_18px_rgba(0,0,0,0.3)] transition-all duration-100 hover:from-[#ff634b] hover:to-[#fc3d21] active:translate-y-[3px] active:shadow-[0_2px_0_#8f1d09]"
           >
             <span>🚀 Return to Launch Complex</span>
             <span aria-hidden="true" className="text-xl transition-transform group-hover:translate-x-1">▸</span>
