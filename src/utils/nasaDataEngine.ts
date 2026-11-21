@@ -3,9 +3,9 @@ import type { NasaDataset, SolTelemetry, VisualEnvironment } from '../store/useG
 export const NASA_API_KEY: string =
   (typeof import.meta !== 'undefined' &&
     import.meta.env &&
-    typeof import.meta.env.VITE_NASA_API_KEY === 'string' &&
-    import.meta.env.VITE_NASA_API_KEY.trim() !== '')
-    ? import.meta.env.VITE_NASA_API_KEY.trim()
+    typeof import.meta.env.NASA_API_KEY === 'string' &&
+    import.meta.env.NASA_API_KEY.trim() !== '')
+    ? import.meta.env.NASA_API_KEY.trim()
     : 'DEMO_KEY';
 export const CURATED_DATA_SOURCE_LABEL = 'Curated Real NASA & CSA Dataset (PDS MEDA • DONKI • RadLab • OSDR • Mars Trek)';
 export const LIVE_DATA_SOURCE_LABEL = '🟢 Live NASA Open API Connected';
